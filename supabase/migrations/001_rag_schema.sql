@@ -2,7 +2,7 @@
 create extension if not exists vector;
 
 -- Documents: one row per uploaded file
-create table documents (
+create table if not exists documents (
   id           uuid primary key default gen_random_uuid(),
   name         text not null,
   size_bytes   integer,
@@ -12,7 +12,7 @@ create table documents (
 
 -- Chunks: many rows per document, each with a 384-dim embedding
 -- 384 dims matches sentence-transformers/all-MiniLM-L6-v2
-create table chunks (
+create table if not exists chunks (
   id           uuid primary key default gen_random_uuid(),
   document_id  uuid not null references documents(id) on delete cascade,
   content      text not null,
