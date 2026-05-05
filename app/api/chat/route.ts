@@ -5,7 +5,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { embedQuery } from '@/lib/rag/embedder'
 import { retrieveChunks } from '@/lib/rag/retriever'
 import { buildPrompt, LLM_MODEL } from '@/lib/groq'
-import type { ChatRequest, Citation } from '@/types'
+import type { Citation } from '@/types'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -14,8 +14,13 @@ const groq = createGroq({ apiKey: process.env.GROQ_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
-    const body: ChatRequest = await req.json()
-    const { message, documentIds } = body
+    const body = await req.json()
+
+    // AI SDK useChat sends { messages: [{role, content},...] }
+    const sdkMessages: { role: string; content: string }[] = body.messages ?? []
+    const lastUserMessage = sdkMessages.findLast((m) => m.role === 'user')
+    const message = lastUserMessage?.content
+    const documentIds: string[] | undefined = body.documentIds
 
     if (!message?.trim()) {
       return new Response(JSON.stringify({ error: 'Message is required.' }), {
