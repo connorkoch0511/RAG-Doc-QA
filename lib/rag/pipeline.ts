@@ -7,8 +7,9 @@ import type { UploadResponse } from '@/types'
 export async function ingestDocument(params: {
   file: File
   supabase: SupabaseClient
+  userId: string
 }): Promise<UploadResponse> {
-  const { file, supabase } = params
+  const { file, supabase, userId } = params
 
   // 1. Parse
   const buffer = await file.arrayBuffer()
@@ -34,6 +35,7 @@ export async function ingestDocument(params: {
       name: file.name,
       size_bytes: file.size,
       mime_type: file.type || 'text/plain',
+      user_id: userId,
     })
     .select('id')
     .single()

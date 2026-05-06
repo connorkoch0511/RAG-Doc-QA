@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createGroq } from '@ai-sdk/groq'
 import { streamText } from 'ai'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAuthClient } from '@/lib/supabase/server'
 import { embedQuery } from '@/lib/rag/embedder'
 import { retrieveChunks } from '@/lib/rag/retriever'
 import { buildPrompt, LLM_MODEL } from '@/lib/groq'
@@ -14,9 +14,16 @@ const groq = createGroq({ apiKey: process.env.GROQ_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const authClient = await createAuthClient()
+    const { data: { user } } = await authClient.auth.getUser()
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
-    // AI SDK useChat sends { messages: [{role, content},...] }
+    const body = await req.json()
     const sdkMessages: { role: string; content: string }[] = body.messages ?? []
     const lastUserMessage = sdkMessages.findLast((m) => m.role === 'user')
     const message = lastUserMessage?.content
@@ -29,22 +36,15 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const supabase = createServerClient()
-
-    // 1. Embed the user's question
     const queryEmbedding = await embedQuery(message)
-
-    // 2. Retrieve the most relevant chunks
     const chunks = await retrieveChunks({
       queryEmbedding,
-      supabase,
+      supabase: authClient,
       documentIds,
     })
 
-    // 3. Build the augmented prompt
     const { system, userPrompt } = buildPrompt(message, chunks)
 
-    // 4. Build citations payload to attach to the response headers
     const citations: Citation[] = chunks.map((chunk, i) => ({
       sourceIndex: i + 1,
       documentName: chunk.document_name,
@@ -53,7 +53,8 @@ export async function POST(req: NextRequest) {
       chunkId: chunk.id,
     }))
 
-    // 5. Stream the LLM response with citations in a custom header
+    const citationsB64 = Buffer.from(JSON.stringify(citations)).toString('base64')
+
     const result = streamText({
       model: groq(LLM_MODEL),
       system,
@@ -61,13 +62,8 @@ export async function POST(req: NextRequest) {
       maxTokens: 1024,
     })
 
-    // Base64-encode citations so non-ASCII characters in chunk text don't break the header
-    const citationsB64 = Buffer.from(JSON.stringify(citations)).toString('base64')
-
     return result.toDataStreamResponse({
-      headers: {
-        'X-Citations': citationsB64,
-      },
+      headers: { 'X-Citations': citationsB64 },
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Chat failed'

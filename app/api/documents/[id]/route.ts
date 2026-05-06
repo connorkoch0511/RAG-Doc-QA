@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAuthClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
@@ -9,10 +9,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = createServerClient()
+    const supabase = await createAuthClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { error } = await supabase.from('documents').delete().eq('id', id)
-
     if (error) throw new Error(error.message)
 
     return NextResponse.json({ success: true })

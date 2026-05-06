@@ -8,9 +8,10 @@ import EmptyState from './EmptyState'
 
 interface Props {
   hasDocuments: boolean
+  selectedDocIds: string[]
 }
 
-export default function ChatInterface({ hasDocuments }: Props) {
+export default function ChatInterface({ hasDocuments, selectedDocIds }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [citationsMap, setCitationsMap] = useState<Map<string, Citation[]>>(new Map())
@@ -69,6 +70,12 @@ export default function ChatInterface({ hasDocuments }: Props) {
     [input, isLoading]
   )
 
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    handleSubmit(e, {
+      body: { documentIds: selectedDocIds.length > 0 ? selectedDocIds : undefined },
+    })
+  }
+
   const hasMessages = messages.length > 0
 
   return (
@@ -107,7 +114,7 @@ export default function ChatInterface({ hasDocuments }: Props) {
 
       {/* Input area */}
       <form
-        onSubmit={handleSubmit}
+        onSubmit={handleFormSubmit}
         className="border-t border-gray-800 px-4 py-3 flex gap-2 items-end"
       >
         <textarea

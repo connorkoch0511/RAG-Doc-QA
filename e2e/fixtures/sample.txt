@@ -1,0 +1,18 @@
+Introduction to Neural Networks
+
+Neural networks are computational models inspired by the human brain. They consist of layers of interconnected nodes, or neurons, that process information using connectionist approaches.
+
+Architecture
+
+A typical neural network has three types of layers:
+1. Input layer - receives raw data
+2. Hidden layers - transform the data through weighted connections
+3. Output layer - produces the final prediction or classification
+
+Training
+
+Neural networks learn through a process called backpropagation. During training, the network makes predictions, calculates the error against known labels, and adjusts weights to minimize that error using gradient descent.
+
+Applications
+
+Neural networks are used in image recognition, natural language processing, speech recognition, and many other fields. Deep learning, which uses many hidden layers, has revolutionized AI research since 2012.

@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAuthClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
 export async function GET() {
   try {
-    const supabase = createServerClient()
+    const supabase = await createAuthClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data, error } = await supabase
       .from('documents')
@@ -14,14 +16,12 @@ export async function GET() {
 
     if (error) throw new Error(error.message)
 
-    // Attach chunk counts
     const documentsWithCounts = await Promise.all(
       (data ?? []).map(async (doc) => {
         const { count } = await supabase
           .from('chunks')
           .select('*', { count: 'exact', head: true })
           .eq('document_id', doc.id)
-
         return { ...doc, chunk_count: count ?? 0 }
       })
     )
