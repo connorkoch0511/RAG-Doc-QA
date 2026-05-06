@@ -1,9 +1,11 @@
 -- Add user_id to documents table
 alter table documents add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
--- Drop the permissive "allow all" policies
+-- Drop all existing policies before recreating
 drop policy if exists "allow all on documents" on documents;
 drop policy if exists "allow all on chunks" on chunks;
+drop policy if exists "users manage own documents" on documents;
+drop policy if exists "users access own chunks" on chunks;
 
 -- Users can only see and manage their own documents
 create policy "users manage own documents" on documents
