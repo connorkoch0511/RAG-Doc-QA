@@ -21,9 +21,7 @@ export default function ChatInterface({ hasDocuments }: Props) {
       const raw = response.headers.get('X-Citations')
       if (raw) {
         try {
-          const citations: Citation[] = JSON.parse(raw)
-          // We'll attach these to the next assistant message via a side-channel.
-          // Store them temporarily keyed by a predictable placeholder.
+          const citations: Citation[] = JSON.parse(atob(raw))
           setCitationsMap((prev) => new Map(prev).set('__pending__', citations))
         } catch {
           // ignore parse errors

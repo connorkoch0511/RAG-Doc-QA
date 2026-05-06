@@ -61,9 +61,12 @@ export async function POST(req: NextRequest) {
       maxTokens: 1024,
     })
 
+    // Base64-encode citations so non-ASCII characters in chunk text don't break the header
+    const citationsB64 = Buffer.from(JSON.stringify(citations)).toString('base64')
+
     return result.toDataStreamResponse({
       headers: {
-        'X-Citations': JSON.stringify(citations),
+        'X-Citations': citationsB64,
       },
     })
   } catch (err: unknown) {
