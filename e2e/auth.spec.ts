@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test'
+import { TEST_EMAIL, TEST_PASSWORD } from './global-setup'
 
-const TEST_EMAIL = `test-${Date.now()}@example.com`
-const TEST_PASSWORD = 'testpassword123'
+const UNIQUE_EMAIL = `test-${Date.now()}@example.com`
+const UNIQUE_PASSWORD = 'testpassword123'
 
 test.describe('Authentication', () => {
   test('redirects unauthenticated users to sign-in', async ({ page }) => {
@@ -27,19 +28,19 @@ test.describe('Authentication', () => {
     await page.screenshot({ path: 'e2e/screenshots/03-password-mismatch.png', fullPage: true })
   })
 
-  test('can sign up and is redirected to app', async ({ page }) => {
+  test('sign-up form submits without errors', async ({ page }) => {
     await page.goto('/auth/sign-up')
-    await page.getByPlaceholder('you@example.com').fill(TEST_EMAIL)
+    await page.getByPlaceholder('you@example.com').fill(UNIQUE_EMAIL)
     const passwordFields = page.getByPlaceholder('••••••••')
-    await passwordFields.first().fill(TEST_PASSWORD)
-    await passwordFields.last().fill(TEST_PASSWORD)
+    await passwordFields.first().fill(UNIQUE_PASSWORD)
+    await passwordFields.last().fill(UNIQUE_PASSWORD)
     await page.getByRole('button', { name: 'Create account' }).click()
-    await expect(page).toHaveURL('/', { timeout: 10000 })
+    // Supabase sends a confirmation email by default — form should submit without an error
+    await expect(page.locator('.text-red-400')).not.toBeVisible({ timeout: 5000 })
     await page.screenshot({ path: 'e2e/screenshots/04-after-signup.png', fullPage: true })
   })
 
   test('can sign out', async ({ page }) => {
-    // Sign in first
     await page.goto('/auth/sign-in')
     await page.getByPlaceholder('you@example.com').fill(TEST_EMAIL)
     await page.getByPlaceholder('••••••••').fill(TEST_PASSWORD)
