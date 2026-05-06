@@ -2,7 +2,7 @@
 
 A full-stack Retrieval-Augmented Generation (RAG) app that lets you upload documents and ask questions grounded in their content — with source citations for every answer.
 
-**Live demo:** [rag-doc-3hofto540-connorkoch0511s-projects.vercel.app](https://rag-doc-3hofto540-connorkoch0511s-projects.vercel.app)
+**Live demo:** [rag-doc-3hofto540-connorkoch0511s-projects.vercel.app](https://rag-doc-qa-five.vercel.app)
 
 ![App screenshot](e2e/screenshots/13-answer-received.png)
 
