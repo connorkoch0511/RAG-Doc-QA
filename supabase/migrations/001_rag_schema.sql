@@ -25,7 +25,7 @@ create table if not exists chunks (
 
 -- IVFFlat index for approximate nearest-neighbor search
 -- lists=100 is appropriate for up to ~1M vectors
-create index on chunks using ivfflat (embedding vector_cosine_ops)
+create index if not exists chunks_embedding_idx on chunks using ivfflat (embedding vector_cosine_ops)
   with (lists = 100);
 
 -- RPC function for similarity search — keeps SQL out of application code
@@ -64,5 +64,11 @@ $$;
 alter table documents enable row level security;
 alter table chunks enable row level security;
 
-create policy "allow all on documents" on documents for all using (true);
-create policy "allow all on chunks" on chunks for all using (true);
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename = 'documents' and policyname = 'allow all on documents') then
+    create policy "allow all on documents" on documents for all using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename = 'chunks' and policyname = 'allow all on chunks') then
+    create policy "allow all on chunks" on chunks for all using (true);
+  end if;
+end $$;
