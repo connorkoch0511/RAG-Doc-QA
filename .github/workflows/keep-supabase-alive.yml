@@ -16,7 +16,9 @@ jobs:
             -H "apikey: ${{ secrets.SUPABASE_RAG_ANON_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_RAG_ANON_KEY }}")
           echo "RAG Document Q&A → HTTP $STATUS"
-          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ] || exit 1
+          # Any HTTP response (even 4xx) means the project is alive and not paused.
+          # A paused project returns 0 (no connection). Only fail on that.
+          [ "$STATUS" -ge 200 ] || exit 1
 
       - name: Ping Job Application Tracker (qtxbctkuoqwfwcpyjxrl)
         run: |
@@ -25,4 +27,6 @@ jobs:
             -H "apikey: ${{ secrets.SUPABASE_JOB_TRACKER_ANON_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_JOB_TRACKER_ANON_KEY }}")
           echo "Job Application Tracker → HTTP $STATUS"
-          [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ] || exit 1
+          # Any HTTP response (even 4xx) means the project is alive and not paused.
+          # A paused project returns 0 (no connection). Only fail on that.
+          [ "$STATUS" -ge 200 ] || exit 1
