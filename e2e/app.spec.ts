@@ -1,14 +1,6 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import path from 'path'
-import { TEST_EMAIL, TEST_PASSWORD } from './global-setup'
-
-async function signIn(page: Page) {
-  await page.goto('/auth/sign-in')
-  await page.getByPlaceholder('you@example.com').fill(TEST_EMAIL)
-  await page.getByPlaceholder('••••••••').fill(TEST_PASSWORD)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL('/', { timeout: 10000 })
-}
+import { signIn } from './auth-helpers'
 
 test.describe('App — Document upload and Q&A', () => {
   test.beforeEach(async ({ page }) => {

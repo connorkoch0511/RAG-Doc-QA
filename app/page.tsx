@@ -2,19 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useUser, useClerk } from '@clerk/nextjs'
 import type { Document } from '@/types'
-import { getSupabaseClient } from '@/lib/supabase/client'
 import DocumentUploader from './components/DocumentUploader'
 import DocumentList from './components/DocumentList'
 import ChatInterface from './components/ChatInterface'
 
 export default function Home() {
   const router = useRouter()
+  const { user } = useUser()
+  const { signOut } = useClerk()
   const [documents, setDocuments] = useState<Document[]>([])
   const [loadingDocs, setLoadingDocs] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [userEmail, setUserEmail] = useState<string | null>(null)
 
   const fetchDocuments = useCallback(async () => {
     setLoadingDocs(true)
@@ -31,20 +32,7 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    const supabase = getSupabaseClient()
-
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserEmail(user?.email ?? null)
-    })
-
     fetchDocuments()
-
-    const channel = supabase
-      .channel('documents')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, fetchDocuments)
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
   }, [fetchDocuments])
 
   const handleUploaded = (doc: Document) => {
@@ -67,9 +55,7 @@ export default function Home() {
   }
 
   const handleSignOut = async () => {
-    await getSupabaseClient().auth.signOut()
-    router.push('/auth/sign-in')
-    router.refresh()
+    await signOut(() => router.push('/sign-in'))
   }
 
   const selectedDocIds = [...selectedIds]
@@ -111,7 +97,7 @@ export default function Home() {
         {/* Sign out */}
         <div className="border-t border-gray-800 px-4 py-3 flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-500 truncate">{userEmail}</p>
+            <p className="text-xs text-gray-500 truncate">{user?.primaryEmailAddress?.emailAddress}</p>
           </div>
           <button
             onClick={handleSignOut}

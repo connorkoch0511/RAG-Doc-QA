@@ -1,45 +1,19 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+// Everything except the Clerk sign-in/sign-up flows and the health check requires a session.
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/api/health'])
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  // Refresh session — must be called on every request
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
-
-  if (!user && !isAuthRoute) {
-    return NextResponse.redirect(new URL('/auth/sign-in', request.url))
+export default clerkMiddleware(async (auth, request) => {
+  if (!isPublicRoute(request)) {
+    await auth.protect()
   }
-
-  if (user && isAuthRoute) {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
-  return supabaseResponse
-}
+})
 
 export const config = {
-  // Run on all routes except static assets and API routes
-  // API routes validate auth themselves
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
+  matcher: [
+    // Skip Next.js internals and static files, unless found in search params
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes
+    '/(api|trpc)(.*)',
+  ],
 }

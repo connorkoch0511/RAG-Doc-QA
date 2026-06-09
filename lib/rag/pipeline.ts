@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { sql, toVector } from '@/lib/db'
 import { parsePDF, parsePlainText } from '@/lib/parsers/pdf'
 import { chunkText } from '@/lib/rag/chunker'
 import { embedTexts } from '@/lib/rag/embedder'
@@ -6,10 +6,9 @@ import type { UploadResponse } from '@/types'
 
 export async function ingestDocument(params: {
   file: File
-  supabase: SupabaseClient
   userId: string
 }): Promise<UploadResponse> {
-  const { file, supabase, userId } = params
+  const { file, userId } = params
 
   // 1. Parse
   const buffer = await file.arrayBuffer()
@@ -29,22 +28,13 @@ export async function ingestDocument(params: {
   }
 
   // 3. Insert document row
-  const { data: docData, error: docError } = await supabase
-    .from('documents')
-    .insert({
-      name: file.name,
-      size_bytes: file.size,
-      mime_type: file.type || 'text/plain',
-      user_id: userId,
-    })
-    .select('id')
-    .single()
+  const docRows = (await sql`
+    insert into documents (name, size_bytes, mime_type, user_id)
+    values (${file.name}, ${file.size}, ${file.type || 'text/plain'}, ${userId})
+    returning id
+  `) as { id: string }[]
 
-  if (docError || !docData) {
-    throw new Error(`Failed to create document record: ${docError?.message}`)
-  }
-
-  const documentId: string = docData.id
+  const documentId: string = docRows[0].id
 
   try {
     // 4. Generate embeddings
@@ -55,24 +45,33 @@ export async function ingestDocument(params: {
       throw new Error('Embedding count mismatch — retry upload.')
     }
 
-    // 5. Batch-insert all chunks
-    const chunkRows = chunks.map((chunk, i) => ({
-      document_id: documentId,
-      content: chunk.content,
-      chunk_index: chunk.chunkIndex,
-      page_number: chunk.pageNumber,
-      token_count: chunk.tokenCount,
-      embedding: embeddings[i],
-    }))
+    // 5. Batch-insert all chunks via unnest (single round-trip)
+    const contents = chunks.map((c) => c.content)
+    const indices = chunks.map((c) => c.chunkIndex)
+    const pages = chunks.map((c) => c.pageNumber)
+    const tokens = chunks.map((c) => c.tokenCount)
+    const embStrings = embeddings.map((e) => toVector(e))
 
-    const { error: chunkError } = await supabase.from('chunks').insert(chunkRows)
-
-    if (chunkError) {
-      throw new Error(`Failed to store chunks: ${chunkError.message}`)
-    }
+    await sql`
+      insert into chunks (document_id, content, chunk_index, page_number, token_count, embedding)
+      select
+        ${documentId}::uuid,
+        t.content,
+        t.chunk_index,
+        t.page_number,
+        t.token_count,
+        t.embedding::vector(384)
+      from unnest(
+        ${contents}::text[],
+        ${indices}::int[],
+        ${pages}::int[],
+        ${tokens}::int[],
+        ${embStrings}::text[]
+      ) as t(content, chunk_index, page_number, token_count, embedding)
+    `
   } catch (err) {
     // Clean up the document row if chunk insertion fails
-    await supabase.from('documents').delete().eq('id', documentId)
+    await sql`delete from documents where id = ${documentId}::uuid`
     throw err
   }
 

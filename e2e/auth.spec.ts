@@ -1,63 +1,39 @@
 import { test, expect } from '@playwright/test'
-import { TEST_EMAIL, TEST_PASSWORD } from './global-setup'
-
-const UNIQUE_EMAIL = `test-${Date.now()}@example.com`
-const UNIQUE_PASSWORD = 'testpassword123'
+import { setupClerkTestingToken } from '@clerk/testing/playwright'
+import { signIn } from './auth-helpers'
 
 test.describe('Authentication', () => {
   test('redirects unauthenticated users to sign-in', async ({ page }) => {
+    await setupClerkTestingToken({ page })
     await page.goto('/')
-    await expect(page).toHaveURL(/\/auth\/sign-in/)
+    await expect(page).toHaveURL(/\/sign-in/)
     await page.screenshot({ path: 'e2e/screenshots/01-sign-in-page.png', fullPage: true })
   })
 
-  test('shows sign-up page', async ({ page }) => {
-    await page.goto('/auth/sign-up')
-    await expect(page.getByRole('heading', { name: 'RAG Doc Q&A' })).toBeVisible()
-    await expect(page.getByPlaceholder('you@example.com')).toBeVisible()
-    await page.screenshot({ path: 'e2e/screenshots/02-sign-up-page.png', fullPage: true })
+  test('shows the Clerk sign-in form', async ({ page }) => {
+    await setupClerkTestingToken({ page })
+    await page.goto('/sign-in')
+    await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible({ timeout: 10000 })
+    await page.screenshot({ path: 'e2e/screenshots/02-sign-in-form.png', fullPage: true })
   })
 
-  test('shows validation error for mismatched passwords', async ({ page }) => {
-    await page.goto('/auth/sign-up')
-    await page.getByPlaceholder('you@example.com').fill('user@example.com')
-    await page.getByPlaceholder('Min. 6 characters').fill('password123')
-    await page.getByPlaceholder('••••••••').fill('different456')
-    await page.getByRole('button', { name: 'Create account' }).click()
-    await expect(page.getByText('Passwords do not match')).toBeVisible()
-    await page.screenshot({ path: 'e2e/screenshots/03-password-mismatch.png', fullPage: true })
+  test('shows the Clerk sign-up form', async ({ page }) => {
+    await setupClerkTestingToken({ page })
+    await page.goto('/sign-up')
+    await expect(page.getByRole('heading', { name: /sign up|create your account/i })).toBeVisible({ timeout: 10000 })
+    await page.screenshot({ path: 'e2e/screenshots/03-sign-up-form.png', fullPage: true })
   })
 
-  test('sign-up form submits without errors', async ({ page }) => {
-    await page.goto('/auth/sign-up')
-    await page.getByPlaceholder('you@example.com').fill(UNIQUE_EMAIL)
-    const passwordFields = page.getByPlaceholder('••••••••')
-    await passwordFields.first().fill(UNIQUE_PASSWORD)
-    await passwordFields.last().fill(UNIQUE_PASSWORD)
-    await page.getByRole('button', { name: 'Create account' }).click()
-    // Supabase sends a confirmation email by default — form should submit without an error
-    await expect(page.locator('.text-red-400')).not.toBeVisible({ timeout: 5000 })
-    await page.screenshot({ path: 'e2e/screenshots/04-after-signup.png', fullPage: true })
+  test('can sign in and reach the app', async ({ page }) => {
+    await signIn(page)
+    await expect(page.getByText('Knowledge Base')).toBeVisible({ timeout: 10000 })
+    await page.screenshot({ path: 'e2e/screenshots/04-after-signin.png', fullPage: true })
   })
 
   test('can sign out', async ({ page }) => {
-    await page.goto('/auth/sign-in')
-    await page.getByPlaceholder('you@example.com').fill(TEST_EMAIL)
-    await page.getByPlaceholder('••••••••').fill(TEST_PASSWORD)
-    await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page).toHaveURL('/', { timeout: 10000 })
-
+    await signIn(page)
     await page.getByRole('button', { name: 'Sign out' }).click()
-    await expect(page).toHaveURL(/\/auth\/sign-in/, { timeout: 5000 })
+    await expect(page).toHaveURL(/\/sign-in/, { timeout: 10000 })
     await page.screenshot({ path: 'e2e/screenshots/05-after-signout.png', fullPage: true })
-  })
-
-  test('shows error for invalid credentials', async ({ page }) => {
-    await page.goto('/auth/sign-in')
-    await page.getByPlaceholder('you@example.com').fill('wrong@example.com')
-    await page.getByPlaceholder('••••••••').fill('wrongpassword')
-    await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page.locator('.text-red-400')).toBeVisible({ timeout: 5000 })
-    await page.screenshot({ path: 'e2e/screenshots/06-invalid-credentials.png', fullPage: true })
   })
 })

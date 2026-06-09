@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthClient, createServiceClient } from '@/lib/supabase/server'
+import { auth } from '@clerk/nextjs/server'
 import { ingestDocument } from '@/lib/rag/pipeline'
 
 export const runtime = 'nodejs'
@@ -10,9 +10,8 @@ const MAX_SIZE_BYTES = 4 * 1024 * 1024
 
 export async function POST(req: NextRequest) {
   try {
-    const authClient = await createAuthClient()
-    const { data: { user } } = await authClient.auth.getUser()
-    if (!user) {
+    const { userId } = await auth()
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -29,8 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File exceeds the 4MB limit.' }, { status: 400 })
     }
 
-    const supabase = createServiceClient()
-    const result = await ingestDocument({ file, supabase, userId: user.id })
+    const result = await ingestDocument({ file, userId })
 
     return NextResponse.json(result)
   } catch (err: unknown) {

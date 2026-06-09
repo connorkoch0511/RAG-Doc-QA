@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthClient } from '@/lib/supabase/server'
+import { auth } from '@clerk/nextjs/server'
+import { sql } from '@/lib/db'
 
 export const runtime = 'nodejs'
 
@@ -9,12 +10,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = await createAuthClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { error } = await supabase.from('documents').delete().eq('id', id)
-    if (error) throw new Error(error.message)
+    // Scoped to the owner; chunks cascade via the foreign key.
+    await sql`delete from documents where id = ${id}::uuid and user_id = ${userId}`
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {

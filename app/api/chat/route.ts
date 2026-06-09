@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
 import { createGroq } from '@ai-sdk/groq'
 import { streamText } from 'ai'
-import { createAuthClient } from '@/lib/supabase/server'
 import { embedQuery } from '@/lib/rag/embedder'
 import { retrieveChunks } from '@/lib/rag/retriever'
 import { buildPrompt, LLM_MODEL } from '@/lib/groq'
@@ -14,9 +14,8 @@ const groq = createGroq({ apiKey: process.env.GROQ_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
-    const authClient = await createAuthClient()
-    const { data: { user } } = await authClient.auth.getUser()
-    if (!user) {
+    const { userId } = await auth()
+    if (!userId) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest) {
     const queryEmbedding = await embedQuery(message)
     const chunks = await retrieveChunks({
       queryEmbedding,
-      supabase: authClient,
+      userId,
       documentIds,
     })
 

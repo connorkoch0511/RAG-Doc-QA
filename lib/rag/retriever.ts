@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { sql, toVector } from '@/lib/db'
 import type { RetrievedChunk } from '@/types'
 
 const MATCH_THRESHOLD = parseFloat(process.env.MATCH_THRESHOLD ?? '0.1')
@@ -15,43 +15,41 @@ interface MatchChunkRow {
 
 export async function retrieveChunks(params: {
   queryEmbedding: number[]
-  supabase: SupabaseClient
+  userId: string
   matchThreshold?: number
   matchCount?: number
   documentIds?: string[]
 }): Promise<RetrievedChunk[]> {
   const {
     queryEmbedding,
-    supabase,
+    userId,
     matchThreshold = MATCH_THRESHOLD,
     matchCount = MATCH_COUNT,
     documentIds,
   } = params
 
-  const { data, error } = await supabase.rpc('match_chunks', {
-    query_embedding: queryEmbedding,
-    match_threshold: matchThreshold,
-    match_count: matchCount,
-    filter_doc_ids: documentIds ?? null,
-  })
+  // null = search all of the user's documents; the SQL function scopes by user.
+  const docIds = documentIds && documentIds.length > 0 ? documentIds : null
 
-  if (error) throw new Error(`Retrieval failed: ${error.message}`)
-  if (!data || data.length === 0) return []
+  const rows = (await sql`
+    select * from match_chunks(
+      ${toVector(queryEmbedding)}::vector(384),
+      ${matchThreshold},
+      ${matchCount},
+      ${docIds}::uuid[],
+      ${userId}
+    )
+  `) as MatchChunkRow[]
 
-  const rows = data as MatchChunkRow[]
+  if (rows.length === 0) return []
 
   // Fetch document names for the unique document IDs in results
   const uniqueDocIds = [...new Set(rows.map((r) => r.document_id))]
-  const { data: docs, error: docError } = await supabase
-    .from('documents')
-    .select('id, name')
-    .in('id', uniqueDocIds)
+  const docs = (await sql`
+    select id, name from documents where id = any(${uniqueDocIds}::uuid[])
+  `) as { id: string; name: string }[]
 
-  if (docError) throw new Error(`Document lookup failed: ${docError.message}`)
-
-  const docNameMap = new Map<string, string>(
-    (docs ?? []).map((d: { id: string; name: string }) => [d.id, d.name])
-  )
+  const docNameMap = new Map<string, string>(docs.map((d) => [d.id, d.name]))
 
   return rows.map((row) => ({
     id: row.id,

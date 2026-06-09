@@ -1,32 +1,30 @@
 import { NextResponse } from 'next/server'
-import { createAuthClient } from '@/lib/supabase/server'
+import { auth } from '@clerk/nextjs/server'
+import { sql } from '@/lib/db'
 
 export const runtime = 'nodejs'
 
 export async function GET() {
   try {
-    const supabase = await createAuthClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data, error } = await supabase
-      .from('documents')
-      .select('id, name, size_bytes, mime_type, created_at')
-      .order('created_at', { ascending: false })
+    const documents = await sql`
+      select
+        d.id,
+        d.name,
+        d.size_bytes,
+        d.mime_type,
+        d.created_at,
+        count(c.id)::int as chunk_count
+      from documents d
+      left join chunks c on c.document_id = d.id
+      where d.user_id = ${userId}
+      group by d.id
+      order by d.created_at desc
+    `
 
-    if (error) throw new Error(error.message)
-
-    const documentsWithCounts = await Promise.all(
-      (data ?? []).map(async (doc) => {
-        const { count } = await supabase
-          .from('chunks')
-          .select('*', { count: 'exact', head: true })
-          .eq('document_id', doc.id)
-        return { ...doc, chunk_count: count ?? 0 }
-      })
-    )
-
-    return NextResponse.json({ documents: documentsWithCounts })
+    return NextResponse.json({ documents })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to load documents'
     console.error('[documents GET]', err)

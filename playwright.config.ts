@@ -25,8 +25,10 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3000',
+    // Probe a public route — every other route 307-redirects into Clerk's
+    // external handshake, which the readiness check can't resolve.
+    url: 'http://localhost:3000/api/health',
     reuseExistingServer: true,
-    timeout: 30000,
+    timeout: 120000,
   },
 })

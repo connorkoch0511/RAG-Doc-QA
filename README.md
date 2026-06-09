@@ -30,8 +30,8 @@ This pipeline is the foundation of most enterprise AI knowledge base products.
 | Framework | Next.js 15 (App Router) | Full-stack, streaming support, Vercel-native |
 | Language | TypeScript | Type safety across the pipeline |
 | Styling | Tailwind CSS | Utility-first, no runtime overhead |
-| Auth | Supabase Auth | Integrated with the DB, no extra service needed |
-| Vector DB | Supabase pgvector | Free tier, SQL-native, `<=>` cosine distance operator |
+| Auth | Clerk | Free tier (10k MAU), drop-in Next.js components, no idle pausing |
+| Vector DB | Neon Postgres + pgvector | Free tier, SQL-native, `<=>` cosine distance; scales to zero but auto-wakes (no keepalive needed) |
 | Embeddings | HuggingFace Inference API (`all-MiniLM-L6-v2`) | Free, 384-dim vectors, strong semantic similarity |
 | LLM | Groq (`llama-3.1-8b-instant`) | Free tier, extremely fast inference |
 | Streaming | Vercel AI SDK (`streamText` + `useChat`) | First-class SSE streaming in Next.js |
@@ -66,7 +66,7 @@ lib/
 ├── rag/
 │   ├── chunker.ts      # Recursive sentence-aware text splitter
 │   ├── embedder.ts     # HuggingFace batched embedding with cold-start retry
-│   ├── retriever.ts    # pgvector cosine similarity search via Supabase RPC
+│   ├── retriever.ts    # pgvector cosine similarity search via the match_chunks SQL function
 │   └── pipeline.ts     # Ingest orchestrator (parse → chunk → embed → store)
 ├── parsers/pdf.ts      # unpdf wrapper with page-number tracking
 └── groq.ts             # Prompt construction with [Source N] citation format
@@ -112,7 +112,7 @@ documents (id, name, size_bytes, mime_type, user_id, created_at)
 chunks    (id, document_id, content, chunk_index, page_number, token_count, embedding vector(384))
 ```
 
-Row Level Security is enabled on both tables — users can only access their own documents.
+`documents.user_id` holds the Clerk user ID. Ownership is enforced in the application layer: every query is scoped by `user_id`, and the `match_chunks` retrieval function takes the authenticated user's ID so similarity search can never return another user's chunks — even if the client tampers with the requested document IDs.
 
 ---
 
@@ -121,7 +121,8 @@ Row Level Security is enabled on both tables — users can only access their own
 ### Prerequisites
 
 - Node.js 18+
-- A [Supabase](https://supabase.com) project with the `vector` extension enabled
+- A [Neon](https://neon.tech) Postgres project (free)
+- A [Clerk](https://clerk.com) application (free)
 - A [Groq](https://console.groq.com) API key (free)
 - A [HuggingFace](https://huggingface.co/settings/tokens) API token (free)
 
@@ -133,15 +134,19 @@ cd RAG-Doc-QA
 npm install
 ```
 
-### 2. Set up Supabase
+### 2. Set up the database (Neon)
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Go to **Database → Extensions** and enable the `vector` extension
-3. Open the **SQL Editor** and run both migration files in order:
-   - `supabase/migrations/001_rag_schema.sql`
-   - `supabase/migrations/002_add_auth.sql`
+1. Create a project at [neon.tech](https://neon.tech) (pgvector is available by default)
+2. Open the **SQL Editor** and run the migration:
+   - `db/migrations/001_schema.sql`
+3. Copy the connection string from **Connection Details** — you'll use it as `DATABASE_URL`
 
-### 3. Configure environment variables
+### 3. Set up auth (Clerk)
+
+1. Create an application at [clerk.com](https://clerk.com) and enable **Email + Password**
+2. Copy the **Publishable key** and **Secret key** from the API Keys page
+
+### 4. Configure environment variables
 
 ```bash
 cp .env.example .env.local
@@ -150,16 +155,16 @@ cp .env.example .env.local
 Edit `.env.local`:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
+DATABASE_URL=postgresql://...neon.tech/neondb?sslmode=require
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
 GROQ_API_KEY=gsk_...
 HUGGINGFACE_API_TOKEN=hf_...
 ```
 
-> **Note:** `SUPABASE_SERVICE_ROLE_KEY` bypasses Row Level Security. It is only used server-side and must never be prefixed with `NEXT_PUBLIC_`.
+> **Note:** `CLERK_SECRET_KEY` and `DATABASE_URL` are server-only — never prefix them with `NEXT_PUBLIC_`.
 
-### 4. Run
+### 5. Run
 
 ```bash
 npm run dev
@@ -189,7 +194,7 @@ Screenshots from each test step are saved to `e2e/screenshots/`.
 
 The app is configured for [Vercel](https://vercel.com). Push to `main` and it deploys automatically.
 
-Set the same five environment variables in **Vercel → Settings → Environment Variables**.
+Set the same environment variables in **Vercel → Settings → Environment Variables**. (Neon is also available as a [Vercel Marketplace](https://vercel.com/marketplace) integration, which auto-populates `DATABASE_URL`.)
 
 ---
 
