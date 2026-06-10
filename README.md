@@ -23,6 +23,25 @@ This pipeline is the foundation of most enterprise AI knowledge base products.
 
 ---
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="33%"><img src="e2e/screenshots/02-sign-in-form.png" alt="Clerk sign-in" /></td>
+    <td width="33%"><img src="e2e/screenshots/09-pipeline-progress.png" alt="Live ingestion pipeline" /></td>
+    <td width="33%"><img src="e2e/screenshots/15-sources-expanded.png" alt="Grounded answer with expandable sources" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Secure sign-in</b><br/>Clerk auth — no idle pausing</sub></td>
+    <td align="center"><sub><b>Live ingestion pipeline</b><br/>parse → chunk → embed → store</sub></td>
+    <td align="center"><sub><b>Grounded answers</b><br/>expandable <code>[Source N]</code> citations</sub></td>
+  </tr>
+</table>
+
+> Every answer is constrained to the retrieved chunks — expand **Sources** to see the exact passages each claim came from. Try it on the [live demo](https://rag-doc-qa-five.vercel.app).
+
+---
+
 ## Tech Stack
 
 | Layer | Technology | Why |
