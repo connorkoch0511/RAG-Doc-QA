@@ -1,6 +1,29 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import path from 'path'
 import { signIn } from './auth-helpers'
+
+// Submits a question and waits for an answer that cites sources. HuggingFace's
+// free inference occasionally cold-starts on the query embedding and returns
+// zero chunks — yielding a "not enough information" answer with no Sources
+// section. When that happens we simply re-ask; by the retry the model is warm.
+async function askWithSources(page: Page, question: string) {
+  const input = page.getByPlaceholder(/Ask a question/)
+  const sources = page.getByText(/Sources \(/).first()
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await expect(input).toBeEnabled()
+    await input.fill(question)
+    await page.keyboard.press('Enter')
+    try {
+      await expect(sources).toBeVisible({ timeout: 30000 })
+      return
+    } catch {
+      if (attempt === 3) throw new Error(`No sources returned after ${attempt} attempts`)
+      // Cold-start retrieval miss — let streaming settle, then re-ask.
+      await expect(input).toBeEnabled({ timeout: 30000 })
+    }
+  }
+}
 
 test.describe('App — Document upload and Q&A', () => {
   test.beforeEach(async ({ page }) => {
@@ -45,8 +68,7 @@ test.describe('App — Document upload and Q&A', () => {
     await page.locator('input[type="file"]').setInputFiles(filePath)
     await expect(page.getByText('sample.txt')).toBeVisible({ timeout: 60000 })
 
-    await page.getByPlaceholder(/Ask a question/).fill('What are the three types of layers in a neural network?')
-    await page.keyboard.press('Enter')
+    await askWithSources(page, 'What are the three types of layers in a neural network?')
     await page.screenshot({ path: 'e2e/screenshots/12-question-sent.png', fullPage: true })
 
     await expect(page.getByText(/input layer|hidden layer|output layer/i)).toBeVisible({ timeout: 60000 })
@@ -58,13 +80,10 @@ test.describe('App — Document upload and Q&A', () => {
     await page.locator('input[type="file"]').setInputFiles(filePath)
     await expect(page.getByText('sample.txt')).toBeVisible({ timeout: 60000 })
 
-    await page.getByPlaceholder(/Ask a question/).fill('What is backpropagation?')
-    await page.keyboard.press('Enter')
-
-    await expect(page.getByText(/Sources \(/)).toBeVisible({ timeout: 30000 })
+    await askWithSources(page, 'What is backpropagation?')
     await page.screenshot({ path: 'e2e/screenshots/14-sources-collapsed.png', fullPage: true })
 
-    await page.getByText(/Sources \(/).click()
+    await page.getByText(/Sources \(/).first().click()
     await expect(page.getByText(/backpropagation/i).first()).toBeVisible()
     await page.screenshot({ path: 'e2e/screenshots/15-sources-expanded.png', fullPage: true })
   })
