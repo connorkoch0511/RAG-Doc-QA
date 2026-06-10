@@ -15,6 +15,10 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 1,
+  // Each test includes a Clerk sign-in (beforeEach) plus, for some, an upload
+  // that waits up to 60s on a HuggingFace cold start. The 30s default is too
+  // tight once external latency is added in.
+  timeout: 120_000,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL,

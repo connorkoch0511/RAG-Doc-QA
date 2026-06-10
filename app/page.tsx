@@ -1,17 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { useUser, useClerk } from '@clerk/nextjs'
+import { useUser, UserButton } from '@clerk/nextjs'
 import type { Document } from '@/types'
 import DocumentUploader from './components/DocumentUploader'
 import DocumentList from './components/DocumentList'
 import ChatInterface from './components/ChatInterface'
 
 export default function Home() {
-  const router = useRouter()
   const { user } = useUser()
-  const { signOut } = useClerk()
   const [documents, setDocuments] = useState<Document[]>([])
   const [loadingDocs, setLoadingDocs] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -54,10 +51,6 @@ export default function Home() {
     })
   }
 
-  const handleSignOut = async () => {
-    await signOut(() => router.push('/sign-in'))
-  }
-
   const selectedDocIds = [...selectedIds]
 
   return (
@@ -94,18 +87,12 @@ export default function Home() {
           />
         </div>
 
-        {/* Sign out */}
+        {/* Account */}
         <div className="border-t border-gray-800 px-4 py-3 flex items-center gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500 truncate">{user?.primaryEmailAddress?.emailAddress}</p>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
-            title="Sign out"
-          >
-            Sign out
-          </button>
+          <UserButton />
         </div>
       </aside>
 

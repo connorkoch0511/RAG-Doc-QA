@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setupClerkTestingToken } from '@clerk/testing/playwright'
+import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright'
 import { signIn } from './auth-helpers'
 
 test.describe('Authentication', () => {
@@ -32,7 +32,10 @@ test.describe('Authentication', () => {
 
   test('can sign out', async ({ page }) => {
     await signIn(page)
-    await page.getByRole('button', { name: 'Sign out' }).click()
+    // Sign-out now lives inside the Clerk <UserButton /> avatar menu; use the
+    // testing helper rather than scripting Clerk's internal portal markup.
+    await clerk.signOut({ page })
+    await page.goto('/')
     await expect(page).toHaveURL(/\/sign-in/, { timeout: 10000 })
     await page.screenshot({ path: 'e2e/screenshots/05-after-signout.png', fullPage: true })
   })
