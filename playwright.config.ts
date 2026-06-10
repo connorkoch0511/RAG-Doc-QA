@@ -4,6 +4,11 @@ import path from 'path'
 
 dotenv.config({ path: path.resolve(__dirname, '.env.local') })
 
+// Target a deployed URL by setting PLAYWRIGHT_BASE_URL (e.g. the Vercel prod URL);
+// otherwise tests run against a locally-started dev server.
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000'
+const isLocal = baseURL.includes('localhost')
+
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
@@ -12,7 +17,7 @@ export default defineConfig({
   retries: 1,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',
@@ -23,12 +28,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    // Probe a public route — every other route 307-redirects into Clerk's
-    // external handshake, which the readiness check can't resolve.
-    url: 'http://localhost:3000/api/health',
-    reuseExistingServer: true,
-    timeout: 120000,
-  },
+  // Only manage a local dev server when testing locally. The readiness probe
+  // hits a public route — every other route 307-redirects into Clerk's
+  // external handshake, which the check can't resolve.
+  ...(isLocal && {
+    webServer: {
+      command: 'npm run dev',
+      url: 'http://localhost:3000/api/health',
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+  }),
 })
